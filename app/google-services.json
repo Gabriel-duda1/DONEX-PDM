@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "160250145359",
+    "project_id": "donex-4559b",
+    "storage_bucket": "donex-4559b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160250145359:android:c6bdad086bdb1aedc2583a",
+        "android_client_info": {
+          "package_name": "com.example.donex"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpQCoQJM3LlALWkruOsig1QRSaPJTH4D4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
