@@ -13,7 +13,6 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(private val repository: PostRepository = PostRepository()) : ViewModel() {
 
-    // Transforma o Flow do Firebase em um StateFlow para a UI do Compose
     val posts: StateFlow<List<Post>> = repository.getPosts()
         .stateIn(
             scope = viewModelScope,
@@ -24,17 +23,36 @@ class MainViewModel(private val repository: PostRepository = PostRepository()) :
     private val _isPosting = MutableStateFlow(false)
     val isPosting = _isPosting.asStateFlow()
 
-    fun createPost(post: Post, onComplete: (Boolean) -> Unit) {
-        _isPosting.value = true
-        repository.savePost(post) { success ->
-            _isPosting.value = false
-            onComplete(success)
+    fun createPost(post: Post, imageUrl: String?, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isPosting.value = true
+            try {
+                val finalPost = if (!imageUrl.isNullOrBlank()) {
+                    post.copy(imageUrl = imageUrl)
+                } else {
+                    post
+                }
+
+                repository.savePost(finalPost) { success ->
+                    _isPosting.value = false
+                    onComplete(success)
+                }
+            } catch (e: Exception) {
+                _isPosting.value = false
+                onComplete(false)
+            }
         }
+    }
+
+    fun iniciarConversa(interessadoId: String, donoDoPostId: String, onChatReady: (String) -> Unit) {
+        val ids = listOf(interessadoId, donoDoPostId).sorted()
+        val chatId = "${ids[0]}_${ids[1]}"
+        onChatReady(chatId)
     }
 
     fun deletePost(postId: String) {
         viewModelScope.launch {
-            repository.deletePost(postId) { /* opcional: tratar erro */ }
+            repository.deletePost(postId) { }
         }
     }
 }

@@ -16,6 +16,9 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
 
+    private val _bioSaved = MutableStateFlow(false)
+    val bioSaved = _bioSaved.asStateFlow()
+
     fun login(email: String, pass: String, onShowMain: () -> Unit) {
         _loading.value = true
         repository.login(email, pass) { success ->
@@ -40,6 +43,19 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
             }
         }
     }
+
+    fun updateBio(descricao: String) {
+        _bioSaved.value = false
+        viewModelScope.launch {
+            repository.updateBio(descricao) { success ->
+                if (success) _bioSaved.value = true
+            }
+        }
+    }
+
+    fun resetBioStatus() { _bioSaved.value = false }
+
+    fun logout() { repository.logout() }
 
     fun clearError() { _error.value = null }
 }

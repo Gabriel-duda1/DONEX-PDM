@@ -3,6 +3,7 @@ package com.example.donex.repository
 import com.example.donex.model.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 class AuthRepository {
     private val auth = FirebaseAuth.getInstance()
@@ -24,6 +25,14 @@ class AuthRepository {
                 onResult(false)
             }
         }
+    }
+
+    fun updateBio(descricao: String, onResult: (Boolean) -> Unit) {
+        val uid = auth.currentUser?.uid ?: return
+        val data = mapOf("descricao" to descricao)
+        db.collection("users").document(uid)
+            .set(data, SetOptions.merge())
+            .addOnCompleteListener { onResult(it.isSuccessful) }
     }
 
     fun logout() = auth.signOut()

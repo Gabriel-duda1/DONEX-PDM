@@ -5,6 +5,7 @@ import com.example.donex.model.Message
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -17,9 +18,10 @@ class ChatRepository {
         val currentUserId = auth.currentUser?.uid ?: ""
         val listener = db.collection("chats")
             .whereArrayContains("userIds", currentUserId)
+            .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
-                    val chats = snapshot.toObjects(Chat::class.java)
+                    val chats = snapshot.documents.mapNotNull { it.toObject(Chat::class.java)?.copy(id = it.id) }
                     trySend(chats)
                 }
             }
@@ -41,42 +43,52 @@ class ChatRepository {
 
     fun sendMessage(chatId: String, text: String) {
         val currentUserId = auth.currentUser?.uid ?: return
-        val message = Message(senderId = currentUserId, text = text)
+        val agora = System.currentTimeMillis()
+
+        val message = Message(
+            senderId = currentUserId,
+            text = text,
+            timestamp = agora
+        )
 
         val chatRef = db.collection("chats").document(chatId)
 
-        db.runTransaction { transaction ->
-            val messageRef = chatRef.collection("messages").document()
-            transaction.set(messageRef, message)
-            transaction.update(chatRef, "lastMessage", text)
-            transaction.update(chatRef, "timestamp", System.currentTimeMillis())
+        val chatUpdate = mapOf(
+            "lastMessage" to text,
+            "timestamp" to agora,
+            "userIds" to chatId.split("_")
+        )
+
+        chatRef.set(chatUpdate, SetOptions.merge()).addOnSuccessListener {
+            chatRef.collection("messages").add(message)
         }
     }
 
     fun startOrGetChat(otherUserId: String, otherUserName: String, onComplete: (String) -> Unit) {
         val currentUserId = auth.currentUser?.uid ?: return
-        val currentUserName = auth.currentUser?.displayName ?: "Utilizador"
+        val chatId = if (currentUserId < otherUserId) "${currentUserId}_${otherUserId}" else "${otherUserId}_${currentUserId}"
+        val chatRef = db.collection("chats").document(chatId)
 
-        db.collection("chats")
-            .whereArrayContains("userIds", currentUserId)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val existingChat = snapshot.documents.find { doc ->
-                    val ids = doc.get("userIds") as? List<*>
-                    ids?.contains(otherUserId) == true
-                }
+        chatRef.get().addOnSuccessListener { doc ->
+            if (doc.exists()) {
+                onComplete(chatId)
+            } else {
+                db.collection("users").document(currentUserId).get().addOnSuccessListener { userDoc ->
+                    val myRealName = userDoc.getString("name") ?: "Usuário"
 
-                if (existingChat != null) {
-                    onComplete(existingChat.id)
-                } else {
-                    val newChatRef = db.collection("chats").document()
                     val newChat = Chat(
-                        id = newChatRef.id,
+                        id = chatId,
                         userIds = listOf(currentUserId, otherUserId),
-                        userNames = mapOf(currentUserId to currentUserName, otherUserId to otherUserName)
+                        userNames = mapOf(
+                            currentUserId to myRealName,
+                            otherUserId to otherUserName
+                        ),
+                        timestamp = System.currentTimeMillis(),
+                        lastMessage = "Conversa iniciada"
                     )
-                    newChatRef.set(newChat).addOnSuccessListener { onComplete(newChatRef.id) }
+                    chatRef.set(newChat).addOnSuccessListener { onComplete(chatId) }
                 }
             }
+        }
     }
 }
